@@ -1,29 +1,18 @@
 /**
- * Funcionalidad 3: Eliminar un miembro de la página
+ * ### Funcionalidad 3: Eliminar un miembro de la página
+ *
  * El usuario administrador del servicio Ghost puede eliminar un usuario suscriptor de su servicio Ghost para que pierda
  * acceso a la cuenta de usuario suscrito y su funcionalidad correspondiente.
+ *
+ * [Link de wiki](https://github.com/c4ts0up/MISW4103-202420-G26/wiki/Listado-de-Funcionalidades#funcionalidad-3-eliminar-un-miembro-de-la-p%C3%A1gina)
  */
 
-import { test, expect } from '@playwright/test';
-import { chromium } from '@playwright/test';
-import LoginPage from "./pages/loginPage";
+import {expect, test} from '@playwright/test';
 import MembersPage from "./pages/membersPage";
-import {mockMembers} from "./data/mockMembers";
-import {adminData} from "./data/admin";
 import {config} from "./config/config";
 import {faker} from "@faker-js/faker";
 
 test.describe('F3', async () => {
-
-    let browser;
-
-    test.beforeAll(async () => {
-        browser = await chromium.launch({ headless: false });
-    });
-
-    test.afterAll(async () => {
-        await browser.close();
-    })
 
     /**
      * E7: Borrado exitoso
@@ -36,47 +25,41 @@ test.describe('F3', async () => {
      * THEN redirige a la pagina principal
      * AND miembro no se puede hallar
      */
-    test('delete member', async({}) => {
-        let context = await browser.newContext();
-        let basePage = await context.newPage();
-
-        let loginPage = new LoginPage(basePage, config.loginPage.url);
-        let membersPage = new MembersPage(basePage, config.membersPage.url);
+    test('delete member', async( { page } ) => {
+        let membersPage = new MembersPage(page, config.membersPage.resource);
 
         const mockName = faker.person.fullName();
         const mockEmail = faker.internet.email();
 
         // GIVEN estoy loggeado como administrador
-        await loginPage.navigateTo();
-        await loginPage.login(
-            adminData.username,
-            adminData.password
-        );
+
 
         // AND estoy en la página de miembros
         await membersPage.navigateTo();
 
         // AND hay un miembro creado
-        await membersPage.createMemberIfMissing(
+        await membersPage.createMember(
             mockName,
             mockEmail
         );
         await membersPage.navigateTo();
 
         // WHEN selecciono un miembro
-        await membersPage.editMember(mockEmail);
+        const selectedMember = await membersPage.findMember(mockEmail)
 
         // AND borro el miembro
-        await membersPage.deleteMember();
+        await membersPage.deleteMember(
+            selectedMember
+        );
 
         // THEN redirige a la pagina principal
-        await membersPage.redirectedToHome();
+        await membersPage.checkRedirection(membersPage.getResource());
+        // vuelve a visitar la página principal para recargar
+        await membersPage.waitTime(5000);
+        await membersPage.navigateTo()
 
         // AND miembro no se puede hallar
-        const member = await membersPage.findMember(mockEmail);
-        expect(member).toBeNull();
-
-        await context.close();
+        const deletedMember = await membersPage.findMember(mockEmail);
+        expect(deletedMember).toBeNull();
     });
-
 });

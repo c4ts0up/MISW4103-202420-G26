@@ -1,89 +1,67 @@
 /**
- * Funcionalidad 5: Modificar el correo electrónico de un suscriptor
+ * ### Funcionalidad 5: Modificar el correo electrónico de un suscriptor
+ *
  * El usuario administrador del servidor Ghost puede modificar el correo electrónico de un usuario suscriptor de su
  * servicio Ghost para actualizar la información personal del usuario.
+ *
+ * [Link de Wiki](https://github.com/c4ts0up/MISW4103-202420-G26/wiki/Listado-de-Funcionalidades#funcionalidad-5-modificar-el-correo-electr%C3%B3nico-de-un-usuario-suscriptor)
  */
 
-// FIXME: flaky. Not waiting correctly to load members
-
-import { test, expect } from '@playwright/test';
-import { chromium } from '@playwright/test';
-import LoginPage from "./pages/loginPage";
+import {expect, test} from '@playwright/test';
 import MembersPage from "./pages/membersPage";
-import {mockMembers} from "./data/mockMembers";
-import {adminData} from "./data/admin";
 import {config} from "./config/config";
-import { faker } from '@faker-js/faker';
+import {faker} from '@faker-js/faker';
 
 test.describe('F5', async () => {
 
-    let browser;
-
-    test.beforeAll(async () => {
-        browser = await chromium.launch({ headless: false });
-    });
-
-    test.afterAll(async () => {
-        await browser.close();
-    });
-
     /**
-     * E8: Cambiar el correo de un miembro por un correo válido
+     * ### E8: Cambiar el correo de un miembro por un correo válido
      *
      * GIVEN estoy loggeado como administrador
-     * AND estoy en la pagina de miembros
-     * AND hay un miembro creado
-     * WHEN selecciono un miembro
-     * AND cambio el correo por un correo valido
-     * AND guardo la edicion del miembro
+     * AND estoy en la página de miembros
+     * AND hay un miembro X creado
+     * WHEN selecciono el miembro X
+     * AND cambio el correo por un correo válido
+     * AND guardo la edición del miembro
      * THEN se deberia guardar el nuevo correo
      * AND se debería mostrar el mensaje "Saved"
      */
-    test('correo válido', async ({}) => {
-        let browser = await chromium.launch({ headless: false });
-        let context = await browser.newContext();
-        let basePage = await context.newPage();
-
-        let loginPage = new LoginPage(basePage, config.loginPage.url);
-        let membersPage = new MembersPage(basePage, config.membersPage.url);
+    test('correo válido', async ( { page } ) => {
+        let membersPage = new MembersPage(page, config.membersPage.resource);
 
         const mockName = faker.person.fullName();
         const mockEmail = faker.internet.email();
         const mockValidEmail = faker.internet.email();
 
         // GIVEN estoy loggeado como administrador
-        await loginPage.navigateTo();
-        await loginPage.login(
-            adminData.username,
-            adminData.password
-        );
 
         // AND estoy en la página de miembros
         await membersPage.navigateTo();
 
         // AND hay un miembro creado
-        await membersPage.createMemberIfMissing(
+        await membersPage.createMember(
             mockName,
             mockEmail
         );
         await membersPage.navigateTo();
 
         // WHEN selecciono un miembro
-        await membersPage.editMember(mockEmail);
+        const selectedMember = await membersPage.findMember(mockEmail);
 
         // AND cambio el correo por un correo válido
-        await membersPage.inputEmail(mockValidEmail);
-
         // AND guardo la edición del miembro
-        await membersPage.saveMemberChanges();
+        const saveButtonResponse = await membersPage.editMember(
+            selectedMember,
+            mockName,
+            mockValidEmail
+        );
 
-        // THEN se debería guardar el nuevo correo
-        // AND se debería mostrar el mensaje "Saved"
-        await membersPage.validateChanges({
-            saveButtonResponse: "Save"
-        });
-
-        await browser.close();
+        // THEN se debería mostrar el mensaje "Saved"
+        expect(saveButtonResponse.trim()).toEqual('Saved');
+        // AND se debería guardar el nuevo correo
+        await membersPage.reload();
+        const emailInput = await membersPage.getEmailInputLocator();
+        await expect(emailInput).toHaveValue(mockValidEmail);
     });
 
 
@@ -92,57 +70,53 @@ test.describe('F5', async () => {
      *
      * GIVEN estoy loggeado como administrador
      * AND estoy en la página de miembros
-     * AND hay un miembro creado
-     * WHEN selecciono un miembro
+     * AND hay un miembro X creado
+     * WHEN selecciono el miembro X
      * AND cambio el correo por un correo inválido
      * AND guardo la edición del miembro
-     * THEN no se debería guardar
-     * AND se debería mostrar el mensaje "Retry"
+     * THEN se debería mostrar el mensaje "Retry"
+     * AND se debería mostrar el mensaje "Invalid Email."
+     * AND no se debería guardar el nuevo correo
      */
-    test('correo inválido', async ({}) => {
-        let context = await browser.newContext();
-        let basePage = await context.newPage();
-
-        let loginPage = new LoginPage(basePage, config.loginPage.url);
-        let membersPage = new MembersPage(basePage, config.membersPage.url);
+    test('correo inválido', async ( { page } ) => {
+        let membersPage = new MembersPage(page, config.membersPage.resource);
 
         const mockName = faker.person.fullName();
         const mockEmail = faker.internet.email();
         const mockInvalidEmail = faker.word.noun();
 
         // GIVEN estoy loggeado como administrador
-        await loginPage.navigateTo();
-        await loginPage.login(
-            adminData.username,
-            adminData.password
-        );
 
         // AND estoy en la página de miembros
         await membersPage.navigateTo();
 
         // AND hay un miembro creado
-        await membersPage.createMemberIfMissing(
+        await membersPage.createMember(
             mockName,
             mockEmail
         );
+        await membersPage.navigateTo();
 
         // WHEN selecciono un miembro
-        await membersPage.editMember(mockEmail);
+        const selectedMember = await membersPage.findMember(mockEmail);
 
         // AND cambio el correo por un correo inválido
-        await membersPage.inputEmail(mockInvalidEmail);
-
         // AND guardo la edición del miembro
-        await membersPage.saveMemberChanges();
+        const saveButtonResponse = await membersPage.editMember(
+            selectedMember,
+            mockName,
+            mockInvalidEmail
+        );
 
-        // THEN no se debería guardar
-        // AND se debería mostrar el mensaje "Retry"
-        await membersPage.validateChanges({
-            saveButtonResponse: "Retry",
-            emailResponse: "Invalid Email."
-        });
-
-        await context.close();
+        // THEN se debería mostrar el mensaje "Retry"
+        expect(saveButtonResponse.trim()).toEqual('Retry');
+        // AND se debería mostrar el mensaje "Invalid Email."
+        const getEmailSaveResponse = await membersPage.getEmailSaveResponse();
+        await expect(getEmailSaveResponse).toHaveText('Invalid Email.')
+        // AND no se debería guardar el nuevo correo
+        await membersPage.reload();
+        const emailInput = await membersPage.getEmailInputLocator();
+        await expect(emailInput).toHaveValue(mockEmail);
     });
 
 
@@ -151,58 +125,70 @@ test.describe('F5', async () => {
      *
      * GIVEN estoy loggeado como administrador
      * AND estoy en la página de miembros
-     * AND hay un miembro creado
-     * WHEN creo un miembro
-     * AND cambio el correo por un correo existente
+     * AND hay un miembro X creado
+     * AND hay un miembro Y creado
+     * WHEN selecciono el miembro Y
+     * AND cambio el correo por el correo de X
      * AND guardo la edición del miembro
-     * THEN se debería guardar el nuevo correo
+     * THEN se debería mostrar el mensaje "Retry"
      * AND se debería mostrar el mensaje "Member already exists. Attempting to add member with existing email address"
+     * AND no se debería guardar el nuevo correo
      */
-    test('correo repetido', async ({}) => {
-        let context = await browser.newContext();
-        let basePage = await context.newPage();
+    test('correo repetido', async ( { page } ) => {
+        let membersPage = new MembersPage(page, config.membersPage.resource);
 
-        let loginPage = new LoginPage(basePage, config.loginPage.url);
-        let membersPage = new MembersPage(basePage, config.membersPage.url);
-
-        const mockName = faker.person.fullName();
-        const mockEmail = faker.internet.email();
-        const mockInvalidEmail = faker.word.noun();
+        const xMockName = faker.person.fullName();
+        const xMockEmail = faker.internet.email();
+        const yMockName = faker.person.fullName();
+        const yMockEmail = faker.internet.email();
 
         // GIVEN estoy loggeado como administrador
-        await loginPage.navigateTo();
-        await loginPage.login(
-            adminData.username,
-            adminData.password
-        );
 
         // AND estoy en la página de miembros
         await membersPage.navigateTo();
 
-        // AND hay un miembro creado
-        await membersPage.createMemberIfMissing(
-            mockName,
-            mockEmail
+        // AND hay un miembro X creado
+        const saveButtonResponseMemberX = await membersPage.createMember(
+            xMockName,
+            xMockEmail
         );
+        expect(saveButtonResponseMemberX.trim()).toEqual('Saved');
+        await membersPage.navigateTo();
 
-        // WHEN creo un miembro
-        // AND cambio el correo por un correo existente
-        await membersPage.baseCreateMember(
-            mockName,
-            mockEmail
+        // AND hay un miembro Y creado
+        const saveButtonResponseMemberY = await membersPage.createMember(
+            yMockName,
+            yMockEmail
+        );
+        expect(saveButtonResponseMemberY.trim()).toEqual('Saved');
+        await membersPage.navigateTo();
+
+        // WHEN selecciono el miembro Y
+        const yMember = await membersPage.findMember(yMockEmail);
+        // AND cambio el correo por el correo de X
+        // AND guardo la edición del miembro
+        const saveButtonResponse = await membersPage.editMember(
+            yMember,
+            yMockName,
+            xMockEmail
         )
 
-        // AND guardo la edición del miembro
-        await membersPage.saveMemberChanges();
+        // THEN se debería mostrar el mensaje "Retry"
+        // FIXME: la aplicación muestra brevemente (~50 ms) "Saved", antes de cambiar a "Retry"
+        expect(membersPage.saveChangesTest())
+        const saveButton = await membersPage.saveChangesTest();
+        await expect(saveButton).toContainText('Retry')
 
-        // THEN no se debería guardar
-        // AND se debería mostrar el mensaje "Retry"
-        await membersPage.validateChanges({
-            saveButtonResponse: "Retry",
-            emailResponse: "Member already exists. Attempting to add member with existing email address"
-        });
-
-        await context.close();
+        // AND se debería mostrar el mensaje "Member already exists. Attempting to add member with existing email address"
+        const getEmailSaveResponse = await membersPage
+            .getEmailSaveResponse();
+        await expect(getEmailSaveResponse).toContainText(
+            'Member already exists. Attempting to edit member with existing email address'
+        );
+        // AND no se debería guardar el nuevo correo
+        await membersPage.reload();
+        const emailInput = await membersPage.getEmailInputLocator();
+        await expect(emailInput).toHaveValue(yMockEmail);
     });
 });
 
